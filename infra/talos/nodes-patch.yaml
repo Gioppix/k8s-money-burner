@@ -1,0 +1,11 @@
+machine:
+    kubelet:
+        extraArgs:
+            cloud-provider: external
+        nodeIP:
+            validSubnets:
+                - 192.168.0.0/16
+    network:
+        interfaces:
+            - interface: eth1
+              dhcp: true
