@@ -10,6 +10,13 @@ _"Does absolutely nothing useful, but it's fast and automatically horizontally s
 
 ## Setup
 
+### Build and Publish the Image
+
+- Login `ghcr.io` in Docker
+- Substitute `ghcr.io/gioppix/burner-backend` with `ghcr.io/<your-github-username>/burner-backend` in all locations
+- Navigate: `cd burner-backend`
+- Run `./publish-image.sh`
+
 ### Hetzner Setup
 
 Create a new Hetzner project and find the API key.
