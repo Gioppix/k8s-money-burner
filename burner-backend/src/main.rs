@@ -1,10 +1,21 @@
+mod logic;
 mod utils;
 
-use actix_web::{App, HttpResponse, HttpServer, get, post};
+use actix_web::{App, HttpResponse, HttpServer, get, web::Path};
+use serde::Serialize;
 
-#[post("/burn")]
-async fn burn() -> HttpResponse {
-    HttpResponse::Ok().body("Burn endpoint")
+#[derive(Serialize)]
+struct BurnResponse {
+    answer: u64,
+}
+
+#[get("/burn/{difficulty}")]
+async fn burn(path: Path<u64>) -> HttpResponse {
+    // This is blocking, and will likely slow down Tokio
+    let difficulty = path.into_inner();
+    let answer = logic::fib(difficulty);
+
+    HttpResponse::Ok().json(BurnResponse { answer })
 }
 
 #[get("/health")]

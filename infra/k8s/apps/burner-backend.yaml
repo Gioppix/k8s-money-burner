@@ -19,7 +19,7 @@ spec:
                     type: RuntimeDefault
             containers:
                 - name: burner-backend
-                  image: ghcr.io/gioppix/burner-backend:latest
+                  image: ghcr.io/gioppix/burner-backend:0.3
                   imagePullPolicy: Always
                   securityContext:
                       allowPrivilegeEscalation: false
