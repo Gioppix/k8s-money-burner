@@ -173,7 +173,14 @@ spec:
                       - ./cluster-autoscaler
                       - --cloud-provider=hetzner
                       - --stderrthreshold=info
-                      - --nodes=0:10:cx23:nbg1:pool1
+                      - --nodes=0:10:cpx42:nbg1:pool1 # Make sure this doesn't exceed Hetzner limit
+                      - --scale-down-enabled=true
+                      - --scale-down-unneeded-time=1m
+                      - --scale-down-delay-after-add=1m
+                      - --scale-down-delay-after-delete=10s
+                      - --scale-down-utilization-threshold=0.5
+                      - --max-node-provision-time=5m
+                      - --scan-interval=10s
                   env:
                       - name: HCLOUD_TOKEN
                         valueFrom:

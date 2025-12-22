@@ -5,6 +5,8 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$DIR/../.."
 
+echo "PROJECT_ROOT: ${PROJECT_ROOT}"
+
 KUBECONFIG="$DIR/kubeconfig.yaml"
 
 if [ ! -f "$KUBECONFIG" ]; then
@@ -37,6 +39,9 @@ EOF
 echo "--> Applying Hetzner Cloud Controller Manager..."
 kubectl apply -f "$DIR/system/hccm.yaml"
 
+echo "--> Deploying Metrics Server (Control Plane + HA)..."
+kubectl apply -f "$DIR/system/metrics-server.yaml"
+
 echo "--> Preparing Worker User Data..."
 WORKER_CONFIG="$PROJECT_ROOT/infra/talos/worker.yaml"
 if [ ! -f "$WORKER_CONFIG" ]; then
@@ -48,7 +53,7 @@ fi
 export WORKER_USER_DATA=$(base64 < "$WORKER_CONFIG" | tr -d '\n')
 
 echo "--> Fetching Image ID from Terraform..."
-export HCLOUD_IMAGE=$(cd "$PROJECT_ROOT/infra/main" && terraform output -json used_image | jq -r '.id')
+export HCLOUD_IMAGE=$(cd "$PROJECT_ROOT/infra/terraform" && terraform output -json used_image | jq -r '.id')
 
 if [ -z "$HCLOUD_IMAGE" ] || [ "$HCLOUD_IMAGE" == "null" ]; then
     echo "Error: Could not fetch HCLOUD_IMAGE from terraform output."
@@ -62,9 +67,7 @@ echo "--> Deploying Cluster Autoscaler..."
 envsubst < "$DIR/system/autoscaler-template.yaml" | kubectl apply -f -
 
 echo "--> Deploying Kubernetes Dashboard..."
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
-helm repo update
-helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard
+kubectl apply -f "$DIR/system/kubernetes-dashboard.yaml"
 
 echo "--> Configuring Dashboard Access..."
 kubectl apply -f "$DIR/system/dashboard-user.yaml"

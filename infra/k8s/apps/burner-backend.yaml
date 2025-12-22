@@ -19,13 +19,20 @@ spec:
                     type: RuntimeDefault
             containers:
                 - name: burner-backend
-                  image: ghcr.io/gioppix/burner-backend:0.3
+                  image: ghcr.io/gioppix/burner-backend:0.2
                   imagePullPolicy: Always
                   securityContext:
                       allowPrivilegeEscalation: false
                       capabilities:
                           drop:
                               - ALL
+                  resources:
+                      requests:
+                          memory: "128Mi"
+                          cpu: "1000m"
+                      limits:
+                          memory: "256Mi"
+                          cpu: "1500m"
                   env:
                       - name: HOST
                         value: "0.0.0.0"
@@ -70,3 +77,28 @@ spec:
           targetPort: 8080
     type: LoadBalancer
     externalTrafficPolicy: Cluster
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+    name: burner-backend-hpa
+spec:
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: burner-backend
+    minReplicas: 2
+    maxReplicas: 100
+    metrics:
+        - type: Resource
+          resource:
+              name: cpu
+              target:
+                  type: Utilization
+                  averageUtilization: 70
+        - type: Resource
+          resource:
+              name: memory
+              target:
+                  type: Utilization
+                  averageUtilization: 80

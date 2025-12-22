@@ -4,10 +4,10 @@ set -e
 
 # Configuration
 IMAGE_NAME="ghcr.io/gioppix/burner-backend"
-VERSION="0.1"
+VERSION="0.2"
 K8S_DEPLOYMENT="../infra/k8s/apps/burner-backend.yaml"
 
-Build and push images
+# Build and push images
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -t "${IMAGE_NAME}:latest" \

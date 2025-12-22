@@ -18,7 +18,7 @@ mv ./talosconfig ./talosconfig.yaml
 talosctl machineconfig patch controlplane.yaml --patch @nodes-patch.yaml --output controlplane.yaml
 talosctl machineconfig patch worker.yaml --patch @nodes-patch.yaml --output worker.yaml
 
-control_plane_ips=($(cd ../main && terraform output -json control_plane_nodes | jq -r '.[] | .ipv4'))
+control_plane_ips=($(cd ../terraform && terraform output -json control_plane_nodes | jq -r '.[] | .ipv4'))
 
 for ip in $control_plane_ips; do
   echo "Applying configuration to node $ip"

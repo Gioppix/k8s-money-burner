@@ -3,6 +3,7 @@ mod utils;
 
 use actix_web::{App, HttpResponse, HttpServer, get, web::Path};
 use serde::Serialize;
+use tokio::task::spawn_blocking;
 
 #[derive(Serialize)]
 struct BurnResponse {
@@ -11,9 +12,12 @@ struct BurnResponse {
 
 #[get("/burn/{difficulty}")]
 async fn burn(path: Path<u64>) -> HttpResponse {
-    // This is blocking, and will likely slow down Tokio
     let difficulty = path.into_inner();
-    let answer = logic::fib(difficulty);
+
+    // This is blocking, and would block Tokio
+    let answer = spawn_blocking(move || logic::fib(difficulty))
+        .await
+        .unwrap();
 
     HttpResponse::Ok().json(BurnResponse { answer })
 }
