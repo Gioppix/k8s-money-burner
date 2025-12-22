@@ -4,7 +4,7 @@ set -e
 
 # Configuration
 IMAGE_NAME="ghcr.io/gioppix/burner-backend"
-VERSION="0.2"
+VERSION="0.3"
 K8S_DEPLOYMENT="../infra/k8s/apps/burner-backend.yaml"
 
 # Build and push images

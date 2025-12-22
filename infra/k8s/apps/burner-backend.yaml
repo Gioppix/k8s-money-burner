@@ -19,7 +19,7 @@ spec:
                     type: RuntimeDefault
             containers:
                 - name: burner-backend
-                  image: ghcr.io/gioppix/burner-backend:0.2
+                  image: ghcr.io/gioppix/burner-backend:0.3
                   imagePullPolicy: Always
                   securityContext:
                       allowPrivilegeEscalation: false
@@ -29,7 +29,7 @@ spec:
                   resources:
                       requests:
                           memory: "128Mi"
-                          cpu: "1000m"
+                          cpu: "900m"
                       limits:
                           memory: "256Mi"
                           cpu: "1500m"
@@ -88,7 +88,7 @@ spec:
         kind: Deployment
         name: burner-backend
     minReplicas: 2
-    maxReplicas: 100
+    maxReplicas: 50
     metrics:
         - type: Resource
           resource:
