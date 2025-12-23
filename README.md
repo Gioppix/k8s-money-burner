@@ -66,16 +66,15 @@ Creating an image is not faster but is less prone to errors and the code is more
 
 ## Horizontal Autoscaling
 
-### Conditions:
-
 - Server type: `cpx42` (8 vCPU, 16gb)
-- Task: Fibonacci of 40
 - Duration: ~1h
-- Pull-based load: instead of req/s, the load is set with concurrent req/s.
 
-![Horizontal Autoscaling](stress/plot.png)
+### "Kind Client" Scenario
 
-### Considerations:
+- Task: Fibonacci of 40
+- The load is set with concurrent req/s. More similar to a pull-based situation.
+
+![Horizontal Autoscaling](stress/concurrency-plot.png)
 
 We can see workers (pods) automatically scaling up and down following load. They reach ~45 pods, or around 9 servers.
 
@@ -83,3 +82,16 @@ In the beginning the addition of new nodes is very clear: you can see jumps of t
 As the workload increases the load is more evenly spread out and new nodes are less visible.
 
 Latency stays pretty consistent overall, with the exception of periods with a sudden increase in requests.
+
+### "Push Based" Scenario
+
+- Task: Fibonacci of 38
+- Push based: simulates normal requests spikes
+
+![Horizontal Autoscaling](stress/requests-plot.png)
+
+Here, since there's no limit on concurrent requests, tasks queue up in the servers so the latency spikes are much higher (even though each task is 4 times easier).
+
+What matters is that after a few minutes new nodes join the cluster and latency stabilizes back to normal values.
+
+P99 spikes around 2200s are interesting; I think it's because after the decrease in load some pods are getting killed and their requests timeout. This could be fixed by implementing a grace period before shutdown.

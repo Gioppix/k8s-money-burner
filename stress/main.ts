@@ -9,7 +9,7 @@ interface BaseLogLine {
 type LogLine = BaseLogLine &
     ({ failed: true } | { failed: false; worker_id: string });
 
-let concurrent_limit = 10;
+let requests_per_second = 10;
 let requestsCompleted = 0;
 let requestsStarted = 0;
 
@@ -27,49 +27,57 @@ setInterval(async () => {
     );
 }, 1000);
 
-interface ConcurrentLimitPhase {
+interface RequestsPerSecondPhase {
     durationSeconds: number;
-    concurrentLimit: number;
+    requestsPerSecond: number;
 }
 
-const CONCURRENT_LIMIT_SCHEDULE: ConcurrentLimitPhase[] = [
-    { durationSeconds: 0, concurrentLimit: 5 },
-    { durationSeconds: 60 * 7, concurrentLimit: 5 },
-    { durationSeconds: 60 * 3, concurrentLimit: 30 },
-    { durationSeconds: 60 * 6, concurrentLimit: 30 },
-    { durationSeconds: 60 * 5, concurrentLimit: 70 },
-    { durationSeconds: 60 * 6, concurrentLimit: 70 },
-    { durationSeconds: 60 * 5, concurrentLimit: 20 },
-    { durationSeconds: 60 * 6, concurrentLimit: 20 },
-    { durationSeconds: 60 * 5, concurrentLimit: 20 },
-    { durationSeconds: 60 * 5, concurrentLimit: 70 },
-    { durationSeconds: 60 * 6, concurrentLimit: 30 },
-    { durationSeconds: 60 * 6, concurrentLimit: 5 },
+// Keep roughly same workload as in concurrency-based benchmark.
+// fib(40) -> fib(38) means 1/4 of the work, as it's exponential.
+// 1 concurrent req ~ 2 req/s using 500ms of avg latency
+// Overall multiplier around 8; make it 7 just in case
+const MULTIPLIER = 7;
+
+const REQUESTS_PER_SECOND_SCHEDULE: RequestsPerSecondPhase[] = [
+    { durationSeconds: 0, requestsPerSecond: 5 * MULTIPLIER },
+    { durationSeconds: 60 * 7, requestsPerSecond: 5 * MULTIPLIER },
+    { durationSeconds: 60 * 3, requestsPerSecond: 30 * MULTIPLIER },
+    { durationSeconds: 60 * 6, requestsPerSecond: 30 * MULTIPLIER },
+    { durationSeconds: 60 * 5, requestsPerSecond: 70 * MULTIPLIER },
+    { durationSeconds: 60 * 6, requestsPerSecond: 70 * MULTIPLIER },
+    { durationSeconds: 60 * 5, requestsPerSecond: 20 * MULTIPLIER },
+    { durationSeconds: 60 * 6, requestsPerSecond: 20 * MULTIPLIER },
+    { durationSeconds: 60 * 5, requestsPerSecond: 20 * MULTIPLIER },
+    { durationSeconds: 60 * 5, requestsPerSecond: 70 * MULTIPLIER },
+    { durationSeconds: 60 * 6, requestsPerSecond: 30 * MULTIPLIER },
+    { durationSeconds: 60 * 6, requestsPerSecond: 5 * MULTIPLIER },
 ];
 
-// Update concurrent limit based on schedule
+// Update requests per second based on schedule
 const scheduleStartTime = Date.now();
 setInterval(() => {
     const elapsedSeconds = (Date.now() - scheduleStartTime) / 1000;
     let cumulativeSeconds = 0;
 
-    for (let i = 0; i < CONCURRENT_LIMIT_SCHEDULE.length; i++) {
-        const phase = CONCURRENT_LIMIT_SCHEDULE[i];
+    for (let i = 0; i < REQUESTS_PER_SECOND_SCHEDULE.length; i++) {
+        const phase = REQUESTS_PER_SECOND_SCHEDULE[i];
         const phaseStartTime = cumulativeSeconds;
         const phaseEndTime = cumulativeSeconds + phase.durationSeconds;
 
         if (elapsedSeconds < phaseEndTime) {
             if (i === 0) {
-                // First phase: use the phase's concurrent limit directly
-                concurrent_limit = phase.concurrentLimit;
+                // First phase: use the phase's requests per second directly
+                requests_per_second = phase.requestsPerSecond;
             } else {
                 // Interpolate between previous phase and current phase
-                const prevPhase = CONCURRENT_LIMIT_SCHEDULE[i - 1];
+                const prevPhase = REQUESTS_PER_SECOND_SCHEDULE[i - 1];
                 const t =
                     (elapsedSeconds - phaseStartTime) / phase.durationSeconds;
-                concurrent_limit = Math.round(
-                    prevPhase.concurrentLimit +
-                        (phase.concurrentLimit - prevPhase.concurrentLimit) * t,
+                requests_per_second = Math.round(
+                    prevPhase.requestsPerSecond +
+                        (phase.requestsPerSecond -
+                            prevPhase.requestsPerSecond) *
+                            t,
                 );
             }
             break;
@@ -79,7 +87,7 @@ setInterval(() => {
     }
 
     // Exit if all phases are complete
-    const totalDuration = CONCURRENT_LIMIT_SCHEDULE.reduce(
+    const totalDuration = REQUESTS_PER_SECOND_SCHEDULE.reduce(
         (sum, phase) => sum + phase.durationSeconds,
         0,
     );
@@ -95,7 +103,7 @@ setInterval(() => {
     const oneSecondAgo = now - 1000;
 
     // Filter to only requests completed in the last second
-    const recentRequests = [];
+    const recentRequests: LogLine[] = [];
     for (let i = LOG_LINES.length - 1; i >= 0; i--) {
         if (LOG_LINES[i].completedAtMs >= oneSecondAgo) {
             recentRequests.push(LOG_LINES[i]);
@@ -128,7 +136,7 @@ setInterval(() => {
     console.log(`  Avg Latency:     ${avgLatency.toFixed(2)} ms`);
     console.log(`  Success Rate:    ${successRate.toFixed(2)}%`);
     console.log(`  Total Completed: ${requestsCompleted}`);
-    console.log(`  Concurrent Limit: ${concurrent_limit} (adjustable)`);
+    console.log(`  Target Req/s:    ${requests_per_second} (adjustable)`);
     console.log("=".repeat(50));
     console.log("\nPress '+' to increase, '-' to decrease limit");
 }, 1000);
@@ -168,26 +176,23 @@ async function fetchWithTiming(
 }
 
 await new Promise<void>((_resolve) => {
-    let activeRequests = 0;
-
+    // Scheduler that thinks in requests per second
+    // If we want 100 req/s, we need to execute one every 10ms
     function scheduler() {
-        while (activeRequests < concurrent_limit) {
-            activeRequests++;
-            const requestId = requestsStarted++;
-            fetchWithTiming(40, requestId).then(() => {
-                requestsCompleted++;
-                activeRequests--;
-                scheduler();
-            });
-        }
+        if (requests_per_second <= 0) return;
+
+        const intervalMs = 1000 / requests_per_second;
+
+        const requestId = requestsStarted++;
+        fetchWithTiming(38, requestId).then(() => {
+            requestsCompleted++;
+        });
+
+        setTimeout(scheduler, intervalMs);
     }
 
-    // Run scheduler periodically
-    setInterval(() => {
-        scheduler();
-    }, 100);
+    // Start the scheduler
+    scheduler();
 });
-
-console.log();
 
 export {};
